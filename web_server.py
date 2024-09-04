@@ -43,5 +43,8 @@ def download_file():
     return send_file(image, as_attachment=True)
 
 
+def run_server():
+    app.run()
+
 if __name__ == '__main__':
     app.run(debug=True)
