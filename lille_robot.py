@@ -3,6 +3,8 @@ from telegram import Update
 from telegram.ext import filters, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler
 from pathlib import Path
 import uuid
+from dotenv import load_dotenv
+import os
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -25,7 +27,10 @@ async def save_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     
 if __name__ == '__main__':
-    application = ApplicationBuilder().token('TOKEN').build()
+    load_dotenv()
+    token = os.getenv('TELEGRAM_BOT_TOKEN')
+
+    application = ApplicationBuilder().token(token).build()
     
     start_handler = CommandHandler('start', start)
     
