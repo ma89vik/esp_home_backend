@@ -15,6 +15,7 @@ def find_oldest_image(directory):
         oldest_file = min(files, key=lambda f: f.stat().st_mtime)
         print(f"The oldest file is: {oldest_file.name}")
     else:
+        oldest_file = None
         print("The directory is empty or contains no files.")
 
     return oldest_file
@@ -22,6 +23,9 @@ def find_oldest_image(directory):
 
 def prepare_image(image_dir):
     image = find_oldest_image(image_dir)
+
+    if not image:
+        return None
 
     image_to_send = Path('images_to_serve')  / image.name
 
@@ -39,5 +43,9 @@ def prepare_image(image_dir):
 def download_file():
     # Path to the directory where your binary files are stored
     image = prepare_image('downloaded_images')
-    print(image)
-    return send_file(image, as_attachment=True)
+
+    if image:
+        return send_file(image, as_attachment=True)
+    else:
+        return '', 204
+        
