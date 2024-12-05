@@ -1,51 +1,70 @@
-from flask import Flask, send_file, abort
+from flask import Flask, send_file, abort, request, jsonify
 from pathlib import Path
 from PIL import Image
- 
-app = Flask(__name__)
+from dotenv import load_dotenv
+import os
+from functools import wraps
 
-def find_oldest_image(directory):
-    directory = Path(directory)
+load_dotenv()
+API_KEY = os.getenv('PHOTOS_API_KEY')
+assert API_KEY is not None
+
+app = Flask(__name__)
+serve_dir = Path('images_to_serve')
+
+def require_api_key(f):
+    """Decorator to require an API key for a route."""
+    @wraps(f) # Preserve the original function's name and metadata
+    def decorated_function(*args, **kwargs):
+        # Look for the API key in headers or query parameters
+        key = request.headers.get("x-api-key") or request.args.get("api_key")
+        if key != API_KEY:
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+
+def prepare_images(image_dir):
+    directory = Path(image_dir)
+
 
     # Get all files in the directory
-    files = [file for file in directory.iterdir() if file.is_file()]
+    for file in directory.iterdir():
+        if not file.is_file():
+            continue
 
-    # Find the newest file based on the modification time
-    if files:
-        oldest_file = min(files, key=lambda f: f.stat().st_mtime)
-        print(f"The oldest file is: {oldest_file.name}")
-    else:
-        oldest_file = None
-        print("The directory is empty or contains no files.")
+        image_to_send = serve_dir / file.name
 
-    return oldest_file
+        with Image.open(file) as img:
+            img.thumbnail((1024,600))
+            img.save(image_to_send)
 
+        # delete the original image
+        file.unlink()
 
-def prepare_image(image_dir):
-    image = find_oldest_image(image_dir)
-
-    if not image:
-        return None
-
-    image_to_send = Path('images_to_serve')  / image.name
-
-    with Image.open(image) as img:
-        img.thumbnail((1024,600))
-        img.save(image_to_send)
-
-    # delete the original image
-    image.unlink()
-
-    return image_to_send
+    images = [file.name for file in serve_dir.iterdir() if file.is_file()]
+    return images
 
 
-@app.route('/download/latest_image', methods=['GET'])
-def download_file():
+@app.route('/get_image_list', methods=['GET'])
+@require_api_key
+def get_image_list():
     # Path to the directory where your binary files are stored
-    image = prepare_image('downloaded_images')
+    images = prepare_images('downloaded_images')
+    print(f'Available images {images}')
 
-    if image:
-        return send_file(image, as_attachment=True)
-    else:
-        return '', 204
-        
+    return jsonify(images)
+
+@app.route('/download/<filename>', methods=['GET'])
+@require_api_key
+def download_image(filename):
+    try:
+        # Construct the file path
+        file_path = serve_dir / filename
+
+        # Serve the file
+        return send_file(file_path, as_attachment=True)
+    except FileNotFoundError:
+        # If the file does not exist, return a 404 error
+        abort(404, description="File not found")
