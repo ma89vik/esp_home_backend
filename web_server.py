@@ -4,6 +4,7 @@ from PIL import Image
 from dotenv import load_dotenv
 import os
 from functools import wraps
+from tinydb import TinyDB, Query
 
 load_dotenv()
 API_KEY = os.getenv('PHOTOS_API_KEY')
@@ -11,6 +12,7 @@ assert API_KEY is not None
 
 app = Flask(__name__)
 serve_dir = Path('images_to_serve')
+db = TinyDB('db.json')
 
 def require_api_key(f):
     """Decorator to require an API key for a route."""
@@ -42,6 +44,7 @@ def prepare_images(image_dir):
 
         # delete the original image
         file.unlink()
+        db.insert({'name': file.name, 'served': False})
 
     images = [file.name for file in serve_dir.iterdir() if file.is_file()]
     return images
@@ -68,3 +71,28 @@ def download_image(filename):
     except FileNotFoundError:
         # If the file does not exist, return a 404 error
         abort(404, description="File not found")
+
+@app.route('/download/latest_image', methods=['GET'])
+@require_api_key
+def download_latest_image():
+    prepare_images('downloaded_images')
+    # Construct the file path
+    image = Query()
+
+    unserved = db.search(image.served == False)
+    print(unserved)
+
+    # Serve the file
+    if unserved:
+        return send_file(serve_dir / unserved[0]['name'], as_attachment=True)
+    else:
+        return '', 204
+
+@app.route('/tag/<filename>', methods=['post'])
+@require_api_key
+def tag_file_server(filename):
+    # Construct the file path
+    image = Query()
+
+    print(f'tagging {served}')
+    served = db.update({'served': True}, image.name == filename)
