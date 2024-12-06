@@ -93,6 +93,5 @@ def download_latest_image():
 def tag_file_server(filename):
     # Construct the file path
     image = Query()
-
-    print(f'tagging {served}')
-    served = db.update({'served': True}, image.name == filename)
+    db.update({'served': True}, image.name == filename)
+    return '', 200
